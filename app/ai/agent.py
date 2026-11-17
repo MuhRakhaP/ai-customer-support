@@ -4,6 +4,7 @@ import re
 from pydantic_ai import Agent, ModelRetry, RunContext
 
 from app import db
+from app.ai.retry import run_with_model_retries
 from app.ai.schemas import AgentReply
 from app.config import settings
 
@@ -18,9 +19,11 @@ Steps:
 2. Call get_section for the section the classifier picked. Call list_sections if you need another.
 3. Answer only with facts from those sections. If they do not answer the question,
    set enough_information to false.
-4. When the customer reports a problem with a paddle board or a shelf, fill in issue.
-   Ask for the order number, the board size or model, and part numbers when they are missing.
-   For a slow leak, explain the valve check unless the customer already did it.
+4. For any reported product defect, missing part, or wrong finish, fill in issue even
+   when the customer provides order or product details. Ask for missing details. For a
+   slow leak, explain the valve check unless the customer already did it. Python decides
+   the next step from the issue details; do not treat a product problem alone as an
+   escalation rule.
 5. Never promise a refund, a shipment, a replacement, a date, or a call. A colleague arranges those.
    Set promises_an_action to true if your reply promises one anyway.
 6. Set action to escalate when an escalation rule applies.
@@ -71,4 +74,5 @@ def check_reply(ctx: RunContext[None], output: AgentReply) -> AgentReply:
 
 def write_reply(thread: str, section: str) -> AgentReply:
     prompt = f"Section picked by the classifier: {section}\n\n{thread}"
-    return support_agent.run_sync(prompt).output
+    result = run_with_model_retries("write support reply", lambda: support_agent.run_sync(prompt))
+    return result.output

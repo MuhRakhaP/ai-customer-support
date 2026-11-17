@@ -1,5 +1,6 @@
 from pydantic_ai import Agent
 
+from app.ai.retry import run_with_model_retries
 from app.ai.schemas import Classification
 from app.config import settings
 
@@ -13,6 +14,11 @@ Sections:
 - returns-and-warranty: returns, refunds, and warranty for any product
 - shipping: delivery, tracking, and shipping of replacement parts
 - other: anything else
+
+Choose the section for the customer's main question, not just the product mentioned.
+Use returns-and-warranty when the request is about returning a product or its warranty;
+use the product section for product information or a product problem; use shipping for
+delivery or replacement-part shipping; use other only when no section covers the topic.
 
 Set needs_human to true when the customer:
 - is angry, threatens a bad review, or uses abusive language
@@ -34,4 +40,5 @@ classifier = Agent(
 
 
 def classify(thread: str) -> Classification:
-    return classifier.run_sync(thread).output
+    result = run_with_model_retries("classify email", lambda: classifier.run_sync(thread))
+    return result.output
